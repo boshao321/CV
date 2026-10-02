@@ -1,0 +1,53 @@
+# Compiles CV.tex on every push and publishes the PDF as the "cv-latest" release.
+# Stable download link used by the website:
+#   https://github.com/boshao321/CV/releases/download/cv-latest/CV_Bo_Shao.pdf
+name: Build CV
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.tex"
+      - "**.cls"
+      - "**.sty"
+      - ".github/workflows/build-cv.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-cv
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile CV.tex
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: CV.tex
+
+      - name: Rename PDF
+        run: cp CV.pdf CV_Bo_Shao.pdf
+
+      - name: Publish to the cv-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Built automatically from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC')."
+          if gh release view cv-latest >/dev/null 2>&1; then
+            gh release upload cv-latest CV_Bo_Shao.pdf --clobber
+            gh release edit cv-latest --notes "$NOTES"
+          else
+            gh release create cv-latest CV_Bo_Shao.pdf --title "Latest CV" --notes "$NOTES" --latest
+          fi
+
+      - name: Keep the PDF as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CV_Bo_Shao
+          path: CV_Bo_Shao.pdf
